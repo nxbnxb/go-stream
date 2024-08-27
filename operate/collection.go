@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// ForeachFn
 func ForeachFn[E any](fn func(e E) E) func([]E) []E {
 	return func(es []E) []E {
 		for i, e := range es {
@@ -16,16 +17,16 @@ func ForeachFn[E any](fn func(e E) E) func([]E) []E {
 	}
 }
 
-func ForeachE[E any](datas []E, fn func(e E) E) []E {
-	for i, e := range datas {
-		datas[i] = fn(e)
+func ForeachE[E any](datum []E, fn func(e E) E) []E {
+	for i, e := range datum {
+		datum[i] = fn(e)
 	}
-	return datas
+	return datum
 }
 
-func GroupBy[K comparable, V any](datas []V, f func(v V) K) map[K][]V {
-	groupByMap := make(map[K][]V, len(datas))
-	for _, data := range datas {
+func GroupBy[K comparable, V any](datum []V, f func(v V) K) map[K][]V {
+	groupByMap := make(map[K][]V, len(datum))
+	for _, data := range datum {
 		key := f(data)
 		groupByMap[key] = append(groupByMap[key], data)
 	}
@@ -74,18 +75,18 @@ func Slice2Set[K comparable](data []K) map[K]bool {
 	}
 	return set
 }
-func SliceCutByStepE[T any](datas []T, step int) [][]T {
-	lenDatas := len(datas)
-	if step > lenDatas {
-		return [][]T{datas}
+func SliceCutByStepE[T any](datum []T, step int) [][]T {
+	lendatum := len(datum)
+	if step > lendatum {
+		return [][]T{datum}
 	}
-	cutSlice := make([][]T, 0, lenDatas/step+1)
+	cutSlice := make([][]T, 0, lendatum/step+1)
 	i := 0
-	for ; i < lenDatas-step; i += step {
-		cutSlice = append(cutSlice, datas[i:i+step])
+	for ; i < lendatum-step; i += step {
+		cutSlice = append(cutSlice, datum[i:i+step])
 	}
-	if i < lenDatas {
-		cutSlice = append(cutSlice, datas[i:])
+	if i < lendatum {
+		cutSlice = append(cutSlice, datum[i:])
 	}
 	return cutSlice
 }
@@ -206,11 +207,11 @@ func FilterE[E any](filters []E, filterFn func(e E) bool) []E {
 	return newE
 }
 
-func TopE[E any](datas []E, top int) []E {
-	if top > len(datas) {
-		top = len(datas)
+func TopE[E any](datum []E, top int) []E {
+	if top > len(datum) {
+		top = len(datum)
 	}
-	return datas[:top]
+	return datum[:top]
 }
 
 func AssertE[E, V any](e E, f func(e E) V) V {
