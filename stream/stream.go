@@ -87,13 +87,3 @@ func (stream *Stream[T]) Top(n int) []T {
 	stream.ResultVal = stream.ResultVal[:n]
 	return stream.ResultVal
 }
-
-func (stream *Stream[T]) GroupBy(f func(v any) any) map[any][]any {
-	stream.exec(0)
-	groupByMap := make(map[any][]any, len(datas))
-	for _, data := range datas {
-		key := f(data)
-		groupByMap[key] = append(groupByMap[key], data)
-	}
-	return groupByMap
-}
