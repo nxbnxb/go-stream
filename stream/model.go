@@ -16,23 +16,3 @@ type Data[T any] struct {
 	Valid bool
 	err   error
 }
-
-func Of[T any](vals []T) *Stream[T] {
-	sc := &Stream[T]{
-		Datum: adapter2Data(vals),
-	}
-	return sc
-}
-
-func adapter2Data[T any](vals []T) chan *Data[T] {
-	var datumCh = make(chan *Data[T], len(vals))
-	for e, val := range vals {
-		datumCh <- &Data[T]{
-			Val:   val,
-			Valid: true,
-			Index: e,
-		}
-	}
-	close(datumCh)
-	return datumCh
-}

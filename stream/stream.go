@@ -3,28 +3,56 @@ package stream
 import (
 	"github.com/nxbnxb/go-stream/operate"
 	"runtime"
-	"sort"
 )
 
-func (options *Option[T]) Filter(filter func(T) bool) *Option[T] {
-	options.options = append(options.options, func(data *Data[T]) (err error) {
+func Of[T any](vals []T) *Stream[T] {
+	sc := &Stream[T]{
+		Datum: valsConvertChanDatum(vals),
+	}
+	return sc
+}
+
+func OfConvert[dst any, src any](vals []src, convert func(src src) dst) *Stream[dst] {
+	dsts := make([]dst, 0, len(vals))
+	for _, val := range vals {
+		dsts = append(dsts, convert(val))
+	}
+	sc := &Stream[dst]{
+		Datum: valsConvertChanDatum(dsts),
+	}
+	return sc
+}
+
+func (stream *Stream[T]) Filter(filter func(T) bool) *Stream[T] {
+	stream.options = append(stream.options, func(data *Data[T]) (err error) {
 		if filter(data.Val) {
 			data.Valid = false
 		}
 		return nil
 	})
-	return options
+	return stream
 }
 
-func (options *Option[T]) Foreach(handler func(T) (T, error)) *Option[T] {
-	options.options = append(options.options, func(data *Data[T]) (err error) {
+func (stream *Stream[T]) Foreach(handler func(T) (T, error)) *Stream[T] {
+	stream.options = append(stream.options, func(data *Data[T]) (err error) {
 		data.Val, err = handler(data.Val)
 		if err != nil {
 			data.err = err
 		}
 		return err
 	})
-	return options
+	return stream
+}
+
+func (stream *Stream[T]) ForeachIndex(handler func(index int, t T) (T, error)) *Stream[T] {
+	stream.options = append(stream.options, func(data *Data[T]) (err error) {
+		data.Val, err = handler(data.Index, data.Val)
+		if err != nil {
+			data.err = err
+		}
+		return err
+	})
+	return stream
 }
 
 func (data *Data[T]) checkDataValid() bool {
@@ -37,53 +65,35 @@ func (data *Data[T]) checkDataValid() bool {
 	return true
 }
 
-func (sc *Stream[T]) exec(pnum int) {
-	if pnum == 0 {
-		pnum = runtime.NumCPU()
+func (stream *Stream[T]) exec(pNum int) {
+	if pNum == 0 {
+		pNum = runtime.NumCPU()
 	}
 
 	var resultDataCh <-chan *Data[T]
-	if pnum == 1 {
-		resultDataCh = operate.Foreach(sc.options...)(sc.Datum)
+	if pNum == 1 {
+		resultDataCh = operate.Foreach(stream.options...)(stream.Datum)
 		return
 	}
-	resultDataCh = operate.MForeach(sc.options...)(sc.Datum, pnum)
-
-	sc.ResultVal = chanDatumAdapterVal(resultDataCh)
+	resultDataCh = operate.MForeach(stream.options...)(stream.Datum, pNum)
+	stream.ResultVal = chanDatumConvertVal(resultDataCh)
 }
 
-func chanDatumAdapterVal[T any](resultDataCh <-chan *Data[T]) []T {
-	resultDatum := make([]Data[T], 0, len(resultDataCh))
-	for data := range resultDataCh {
-		if !data.checkDataValid() {
-			continue
-		}
-		resultDatum = append(resultDatum, *data)
+func (stream *Stream[T]) Top(n int) []T {
+	stream.exec(0)
+	if len(stream.ResultVal) < n {
+		n = len(stream.ResultVal)
 	}
-	sort.SliceStable(resultDatum, func(i, j int) bool {
-		return resultDatum[i].Index < resultDatum[j].Index
-	})
-	resultVal := make([]T, 0, len(resultDatum))
-
-	for e := range resultDatum {
-		resultVal = append(resultVal, resultDatum[e].Val)
-	}
-	return resultVal
+	stream.ResultVal = stream.ResultVal[:n]
+	return stream.ResultVal
 }
 
-func (sc *Stream[T]) Top(n int) []T {
-	sc.exec(0)
-	if len(sc.ResultVal) < n {
-		n = len(sc.ResultVal)
+func (stream *Stream[T]) GroupBy(f func(v any) any) map[any][]any {
+	stream.exec(0)
+	groupByMap := make(map[any][]any, len(datas))
+	for _, data := range datas {
+		key := f(data)
+		groupByMap[key] = append(groupByMap[key], data)
 	}
-	sc.ResultVal = sc.ResultVal[:n]
-	return sc.ResultVal
-}
-
-func Adapter[T, N any](sc *Stream[T], adapter func(t T) N) *Stream[N] {
-	ns := make([]N, 0, len(sc.ResultVal))
-	for _, v := range sc.ResultVal {
-		ns = append(ns, adapter(v))
-	}
-	return Of(ns)
+	return groupByMap
 }
